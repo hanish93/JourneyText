@@ -12,11 +12,18 @@ outdir.mkdir(parents=True, exist_ok=True)
 
 result = process_video(str(video_path))
 
-# console preview
-print("Event  :", result["event"])
-print("Summary:\n", result["summary"])
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(message)s",
+)
+log = logging.getLogger(__name__)
 
-# save to disk
+# ---- pipeline -------------------------------------------------------------
+result = process_video(str(video_path))
+
+log.info("Event  : %s", result["event"])
+log.info("Summary:\n%s", result["summary"])
+
 summary_file = outdir / f"{video_path.stem}_summary.txt"
 summary_file.write_text(result["summary"], encoding="utf-8")
-print(f"\n[✓] Summary saved to {summary_file.relative_to(Path.cwd())}")
+log.info("\n[✓] Summary saved to %s", summary_file.relative_to(Path.cwd()))
