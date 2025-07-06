@@ -1,40 +1,39 @@
-FROM python:3.9-slim
+# Dockerfile
+FROM nvcr.io/nvidia/pytorch:23.10-py3
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     libsm6 \
     libxext6 \
-    git \
-    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install PyTorch CPU first
+# Install Python dependencies
 RUN pip install --no-cache-dir \
-    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+    streamlit==1.28.0 \
+    opencv-python-headless==4.8.0.76 \
+    decord==0.6.0 \
+    transformers==4.35.0 \
+    sentencepiece==0.1.99 \
+    accelerate==0.25.0 \
+    einops==0.7.0 \
+    timm==0.9.12 \
+    moviepy==1.0.3 \
+    pandas==2.1.3
 
-# Install MoviePy dependencies first
-RUN pip install --no-cache-dir \
-    numpy==1.23.5 \
-    decorator==5.1.1 \
-    imageio==2.31.1 \
-    imageio-ffmpeg==0.4.8
-
-# Then install other packages
-RUN pip install --no-cache-dir \
-    streamlit \
-    opencv-python-headless==4.9.0.80 \
-    decord \
-    transformers \
-    sentencepiece \
-    accelerate \
-    einops \
-    timm \
-    pandas \
-    moviepy==1.0.3  # Explicit version
-
+# Create app directory
 WORKDIR /app
-COPY . .
 
+# Copy application files
+COPY app.py cli.py utils.py ./
+
+# Create directories
+RUN mkdir -p /app/model_cache && \
+    mkdir -p /data/videos && \
+    mkdir -p /data/results
+
+# Expose Streamlit port
 EXPOSE 8501
+
+# Set default command
 CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]

@@ -1,117 +1,107 @@
-# app.py (CPU optimized)
+# app.py
 import streamlit as st
 import os
 import time
+import torch
 from utils import process_video
 
 # Configure Streamlit
 st.set_page_config(
-    page_title="Journey Summarizer (CPU)",
+    page_title="Journey Summarizer",
     page_icon="🚗",
-    layout="centered"  # Changed from wide to centered for better mobile view
+    layout="wide"
 )
 
 # Custom CSS
 st.markdown("""
     <style>
-    .stVideo { border-radius: 10px; max-width: 100%; }
+    .stVideo { border-radius: 10px; }
     .summary-box { 
-        padding: 15px; 
+        padding: 20px; 
         border-radius: 10px; 
         background-color: #f0f2f6; 
-        margin: 10px 0;
-        font-size: 0.9em;
+        margin-top: 20px;
     }
-    .highlight { 
-        background-color: #fffacd; 
-        padding: 2px 5px; 
-        border-radius: 3px;
-        font-size: 0.9em;
-    }
-    .stSpinner > div { margin: 0 auto; }
-    .small-text { font-size: 0.8em; }
+    .highlight { background-color: #fffacd; padding: 2px 5px; border-radius: 3px; }
+    .error-box { background-color: #ffebee; color: #b71c1c; padding: 15px; border-radius: 5px; }
     </style>
     """, unsafe_allow_html=True)
 
+def display_results(result):
+    """Display processing results"""
+    if "error" in result:
+        st.error("Processing Error")
+        st.markdown(f'<div class="error-box">{result["error"]}</div>', unsafe_allow_html=True)
+        return
+        
+    st.subheader("Navigation Analysis")
+    col1, col2 = st.columns([1, 3])
+    
+    with col1:
+        st.metric("Detected Event", result["event"])
+        if result.get("frames") and len(result["frames"]) > 0:
+            st.image(result["frames"][0], caption="Key Frame", use_column_width=True)
+        else:
+            st.warning("No frames available for display")
+    
+    with col2:
+        st.subheader("Journey Summary")
+        st.markdown(f'<div class="summary-box">{result["summary"]}</div>', unsafe_allow_html=True)
+        
+        if "error" not in result["summary"].lower():
+            st.subheader("Navigation Instructions")
+            instructions = [s.strip() for s in result["summary"].split(". ") if s.strip()]
+            if instructions:
+                for i, instruction in enumerate(instructions):
+                    st.markdown(f"{i+1}. <span class='highlight'>{instruction}</span>", 
+                               unsafe_allow_html=True)
+            else:
+                st.info("No instructions generated")
+
 # App header
-st.title("🚗 Journey Summarization (CPU Version)")
-st.markdown("""
-    <p class="small-text">Upload a driving video to generate navigation instructions</p>
-    """, unsafe_allow_html=True)
+st.title("🚗 Journey Summarization Using Visual-Language Models")
+st.markdown("Upload driving videos to generate AI-powered navigation summaries")
 st.divider()
 
-# File uploader with size limit
-MAX_MB = 200
+# File uploader
 uploaded_file = st.file_uploader(
-    f"Upload driving video (MP4, max {MAX_MB}MB)", 
-    type=["mp4"],
+    "Upload driving video (MP4, AVI, MOV)", 
+    type=["mp4", "avi", "mov"],
     accept_multiple_files=False
 )
 
 if uploaded_file:
-    file_size = len(uploaded_file.getvalue()) / (1024 * 1024)  # in MB
-    if file_size > MAX_MB:
-        st.error(f"File too large. Maximum size is {MAX_MB}MB")
-        st.stop()
-    
-    # Save uploaded file
-    video_path = f"./temp_{int(time.time())}.mp4"
     try:
+        # Save uploaded file
+        video_path = f"temp_{int(time.time())}.mp4"
         with open(video_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
         
         # Display video
         st.video(video_path)
         
-        # Process video with progress
-        with st.spinner("Analyzing video (this may take a minute)..."):
+        # Process video
+        with st.spinner("Analyzing video content..."):
             result = process_video(video_path)
-        
-        # Display results
-        st.subheader("Navigation Analysis")
-        
-        col1, col2 = st.columns([1, 2])
-        
-        with col1:
-            st.metric("Detected Event", result["event"])
-            if result["frames"]:
-                st.image(result["frames"][0], caption="Key Frame", use_container_width=True)
-        
-        with col2:
-            st.subheader("Journey Summary")
-            st.markdown(f'<div class="summary-box">{result["summary"]}</div>', 
-                       unsafe_allow_html=True)
+            display_results(result)
             
-            # Generate navigation instructions
-            st.subheader("Key Instructions")
-            instructions = [s.strip() for s in result["summary"].split(". ") if s.strip()]
-            for i, instruction in enumerate(instructions[:3]):  # Show max 3 instructions
-                st.markdown(f"{i+1}. <span class='highlight'>{instruction}</span>", 
-                           unsafe_allow_html=True)
-        
     except Exception as e:
-        st.error(f"Error processing video: {str(e)}")
+        st.error(f"Processing failed: {str(e)}")
     finally:
-        # Clean up
         if os.path.exists(video_path):
             os.remove(video_path)
 
-# Add sidebar information
-st.sidebar.header("About (CPU Version)")
+# CLI instructions
+st.sidebar.header("CLI Processing")
 st.sidebar.markdown("""
-<p class="small-text">
-This CPU-optimized version uses smaller models and processes fewer frames to run without GPU.
-</p>
+**Process videos via CLI while Docker is running:**
+```bash
+# Process a video file
+docker exec -it journey-container \\
+  python cli.py /data/videos/input.mp4 \\
+  --output /data/results/output.json
 
-**Limitations:**
-- Processes only key frames
-- Simplified descriptions
-- Longer processing time
-
-**Tips:**
-- Use short videos (<30 sec)
-- Landscape orientation works best
-- Well-lit scenes give better results
-""", unsafe_allow_html=True)
-st.sidebar.divider()
-st.sidebar.info("Upload a short driving video to begin")
+# Mount custom directories
+docker run -d ... \\
+  -v /host/videos:/data/videos \\
+  -v /host/results:/data/results""")
