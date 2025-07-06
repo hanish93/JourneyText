@@ -25,7 +25,7 @@ RUN pip install --no-cache-dir \
 WORKDIR /app
 
 # Copy application files
-COPY app.py cli.py utils.py ./
+COPY . .
 
 # Create directories
 RUN mkdir -p /app/model_cache && \
